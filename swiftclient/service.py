@@ -498,10 +498,8 @@ class SwiftService(object):
         """
         if options is not None:
             options = dict(self._options, **options)
-            logger.info('Nachiket')
         else:
             options = self._options
-            logger.info('Nachiket')
 
         if not container:
             if objects:
