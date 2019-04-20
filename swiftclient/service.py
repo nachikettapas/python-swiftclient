@@ -496,7 +496,7 @@ class SwiftService(object):
 
         :raises SwiftError:
         """
-        logger.info('Reached here!!')
+        logger.exception('Reached here!!')
         if options is not None:
             options = dict(self._options, **options)
         else:
