@@ -662,8 +662,10 @@ class SwiftService(object):
         """
         if options is not None:
             options = dict(self._options, **options)
+            logger.exception("Error:Nachiket")
         else:
             options = self._options
+            logger.exception("Error:Nachiket")
 
         res = {
             'success': True,
