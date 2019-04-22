@@ -251,6 +251,7 @@ def get_conn(options):
     """
     Return a connection building it from the options.
     """
+    logger.info('Nachiket')
     return Connection(options['auth'],
                       options['user'],
                       options['key'],
