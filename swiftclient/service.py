@@ -36,6 +36,20 @@ from six.moves.urllib.parse import quote
 
 import json
 
+#==================Nachiket====================
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+
+file_dir = os.path.dirname("/home/osbash/upload_file/")
+with open(os.path.join(file_dir, "private_key_client.pem"), "rb") as key_file:
+    client_private_key = serialization.load_pem_private_key(
+        key_file.read(),
+        password=None,
+        backend=default_backend()
+    )
+#==================Nachiket====================
 
 from swiftclient import Connection
 from swiftclient.command_helpers import (
@@ -251,7 +265,6 @@ def get_conn(options):
     """
     Return a connection building it from the options.
     """
-    #logger.info('Nachiket')
     return Connection(options['auth'],
                       options['user'],
                       options['key'],
@@ -663,10 +676,8 @@ class SwiftService(object):
         """
         if options is not None:
             options = dict(self._options, **options)
-            logger.exception("Error:Nachiket")
         else:
             options = self._options
-            logger.exception("Error:Nachiket")
 
         res = {
             'success': True,
@@ -1424,6 +1435,31 @@ class SwiftService(object):
         :raises SwiftError:
         :raises ClientException:
         """
+
+        #===============Nachiket==============
+        file_sec = {}
+        for flname in objects:
+            flsec = {}
+            md5file = md5()
+            md5file.update(flname)
+            flsec['file_hash'] = md5file.hexdigest()
+
+            try:
+                fp = open(flname, 'rb', DISK_BUFFER)
+            except IOError:
+                pass
+            else:
+                with fp:
+                    md5content = md5()
+                    while True:
+                        data = fp.read(DISK_BUFFER)
+                        if not data:
+                            break
+                        md5content.update(data)
+                    flsec['content_hash'] = md5content.hexdigest()
+            file_sec[flname] = flsec
+        #===============Nachiket==============
+
         if options is not None:
             options = dict(self._options, **options)
         else:
@@ -1501,11 +1537,17 @@ class SwiftService(object):
             o = upload_object.object_name
             o_opts = upload_object.options
             details = {'action': 'upload', 'container': container}
+            
             if o_opts is not None:
                 object_options = deepcopy(options)
                 object_options.update(o_opts)
             else:
                 object_options = options
+
+            #===============Nachiket==============
+            object_options['file_sec'] = file_sec
+            #===============Nachiket==============
+
             if hasattr(s, 'read'):
                 # We've got a file like object to upload to o
                 file_future = self.thread_manager.object_uu_pool.submit(
@@ -1519,6 +1561,7 @@ class SwiftService(object):
                 # We've got a path to upload to o
                 details['path'] = s
                 details['object'] = o
+            
                 if isdir(s):
                     dir_future = self.thread_manager.object_uu_pool.submit(
                         self._create_dir_marker_job, container, o,
@@ -2030,6 +2073,24 @@ class SwiftService(object):
                 put_headers = {'x-object-meta-mtime': "%f" % getmtime(path)}
             else:
                 put_headers = {'x-object-meta-mtime': "%f" % round(time())}
+            
+            #================Nachiket====================
+            file_sig = {}
+            file_sig['file_hash'] = options['file_sec'][obj]['file_hash']
+            file_sig['timestamp'] = put_headers['x-object-meta-mtime']
+
+            content_sig = {}
+            content_sig['content_hash'] = options['file_sec'][obj]['content_hash']
+            content_sig['timestamp'] = put_headers['x-object-meta-mtime']
+
+            put_headers['file_sign']  = client_private_key.sign(
+                                            str(file_sig), 
+                                            ec.ECDSA(hashes.SHA256())).encode('hex')
+
+            put_headers['content_sign']  = client_private_key.sign(
+                                            str(content_sig), 
+                                            ec.ECDSA(hashes.SHA256())).encode('hex')
+            #================Nachiket====================
 
             res['headers'] = put_headers
 

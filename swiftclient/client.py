@@ -23,6 +23,24 @@ import logging
 import warnings
 
 from distutils.version import StrictVersion
+#===================Nachiket===============
+import os
+from hashlib import md5
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+
+file_dir = os.path.dirname("/home/osbash/upload_file/")
+with open(os.path.join(file_dir, "public_key_swift.pem"), "rb") as key_file:
+    swift_public_key = serialization.load_pem_public_key(
+        key_file.read(),
+        backend=default_backend()
+    )
+
+#===================Nachiket===============
 from requests.exceptions import RequestException, SSLError
 from six.moves import http_client
 from six.moves.urllib.parse import quote as _quote, unquote
@@ -1374,6 +1392,22 @@ def put_object(url, token=None, container=None, name=None, contents=None,
         conn.request('PUT', path, contents, headers)
 
     resp = conn.getresponse()
+   
+    #=====================Nachiket===========================
+    received_proof_sign = resp.headers['sto-proof-sign'].decode('hex')
+    #received_proof = 'cc484b89fa92dd391a82294f364ea86a'
+
+    storage_proof = {}
+    storage_proof['etag'] = resp.headers['Etag']
+    storage_proof['x-timestamp'] = resp.headers['Last-Modified']
+
+    try:
+        swift_public_key.verify(received_proof_sign, str(storage_proof),
+            ec.ECDSA(hashes.SHA256()))
+    except InvalidSignature:
+        raise ClientException.from_response(resp, 'Object PUT verification failed', body)
+    #=====================Nachiket===========================
+
     body = resp.read()
     http_log(('%s%s' % (url.replace(parsed.path, ''), path), 'PUT',),
              {'headers': headers}, resp, body)
@@ -1868,7 +1902,6 @@ class Connection(object):
                    etag=None, chunk_size=None, content_type=None,
                    headers=None, query_string=None, response_dict=None):
         """Wrapper for :func:`put_object`"""
-
         def _default_reset(*args, **kwargs):
             raise ClientException('put_object(%r, %r, ...) failure and no '
                                   'ability to reset contents for reupload.'
@@ -1890,6 +1923,7 @@ class Connection(object):
                         seek(orig_pos)
                 elif reset:
                     reset_func = reset
+
         return self._retry(reset_func, put_object, container, obj, contents,
                            content_length=content_length, etag=etag,
                            chunk_size=chunk_size, content_type=content_type,
